@@ -87,28 +87,42 @@ async function deactivateFailedTab(tabId, error) {
   await detachTab(tabId);
 }
 
-chrome.action.onClicked.addListener(async function callback(tab) {
-  console.log("Action icon clicked. Attaching/detaching the tab.");
-  const tabId = tab && tab.id;
-  if (typeof tabId !== 'number')
-    return;
-  const active = await isTabActive(tabId);
-  await (active ? detachTab(tabId) : attachTab(tabId));
+function runAsync(label, callback) {
+  callback().catch(function (error) {
+    console.warn(label, error.message);
+  });
+}
+
+chrome.action.onClicked.addListener(function callback(tab) {
+  runAsync("failed to handle action click", async function () {
+    console.log("Action icon clicked. Attaching/detaching the tab.");
+    const tabId = tab && tab.id;
+    if (typeof tabId !== 'number')
+      return;
+    const active = await isTabActive(tabId);
+    await (active ? detachTab(tabId) : attachTab(tabId));
+  });
 });
 
-chrome.tabs.onActivated.addListener(async function callback(data) {
-  // console.log("A tab activated. Updating icon.");
-  await updateIcon(data.tabId);
+chrome.tabs.onActivated.addListener(function callback(data) {
+  runAsync("failed to update icon for activated tab", async function () {
+    // console.log("A tab activated. Updating icon.");
+    await updateIcon(data.tabId);
+  });
 });
 
-chrome.tabs.onUpdated.addListener(async function callback(tabId) {
-  // Chrome can reset the per-tab action icon during reload/navigation.
-  await updateIcon(tabId);
+chrome.tabs.onUpdated.addListener(function callback(tabId) {
+  runAsync("failed to update icon for updated tab", async function () {
+    // Chrome can reset the per-tab action icon during reload/navigation.
+    await updateIcon(tabId);
+  });
 });
 
-chrome.debugger.onDetach.addListener(async function callback(source) {
-  if (source && typeof source.tabId === 'number')
-    await setTabActive(source.tabId, false);
+chrome.debugger.onDetach.addListener(function callback(source) {
+  runAsync("failed to handle debugger detach", async function () {
+    if (source && typeof source.tabId === 'number')
+      await setTabActive(source.tabId, false);
+  });
 });
 
 async function handleMessage(request, sender) {

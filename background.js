@@ -111,19 +111,25 @@ chrome.debugger.onDetach.addListener(async function callback(source) {
     await setTabActive(source.tabId, false);
 });
 
-chrome.runtime.onMessage.addListener(function handleMessage(request, sender) {
+async function handleMessage(request, sender) {
   //filtering out inactive tabs
   var tabId = sender.tab && sender.tab.id;
   if (typeof tabId !== 'number')
     return;
-  isTabActive(tabId).then(async function (active) {
-    if (active) {
-      console.log("received request from clientScript on active tab", request);
-      await dispatchNativeEvent(request, tabId);
-    }
-  }).catch(function (error) {
+
+  if (await isTabActive(tabId)) {
+    console.log("received request from clientScript on active tab", request);
+    await dispatchNativeEvent(request, tabId);
+  }
+}
+
+chrome.runtime.onMessage.addListener(function callback(request, sender, sendResponse) {
+  handleMessage(request, sender).catch(function (error) {
     console.warn("failed to handle message", request, error.message);
+  }).finally(function () {
+    sendResponse();
   });
+  return true;
 });
 
 //part 2. turning messages into native events for active tabs.

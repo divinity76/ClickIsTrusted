@@ -29,7 +29,10 @@ async function updateIcon(tabId, active) {
   try {
     await chrome.action.setIcon({
       tabId: tabId,
-      path: `images/${color}_16.png`
+      path: {
+        16: `images/${color}_16.png`,
+        32: `images/${color}_32.png`
+      }
     });
   } catch (error) {
     console.warn("failed to update icon for tab: " + tabId, error.message);

@@ -3,24 +3,22 @@
 //part 1. activating/deactivating the debugger via the extension action button.
 const STORAGE_KEY = 'activeTabs';
 
-async function getActiveTabs() {
-  const data = await chrome.storage.session.get(STORAGE_KEY);
-  return data[STORAGE_KEY] || {};
+function tabStorageKey(tabId) {
+  return `${STORAGE_KEY}.${tabId}`;
 }
 
 async function setTabActive(tabId, active) {
-  const activeTabs = await getActiveTabs();
+  const key = tabStorageKey(tabId);
   if (active)
-    activeTabs[tabId] = true;
+    await chrome.storage.session.set({[key]: true});
   else
-    delete activeTabs[tabId];
-  await chrome.storage.session.set({[STORAGE_KEY]: activeTabs});
+    await chrome.storage.session.remove(key);
   await updateIcon(tabId, active);
 }
 
 async function isTabActive(tabId) {
-  const activeTabs = await getActiveTabs();
-  return Boolean(activeTabs[tabId]);
+  const key = tabStorageKey(tabId);
+  return Boolean((await chrome.storage.session.get(key))[key]);
 }
 
 async function updateIcon(tabId, active) {
@@ -83,11 +81,13 @@ chrome.runtime.onMessage.addListener(function handleMessage(request, sender) {
   var tabId = sender.tab && sender.tab.id;
   if (typeof tabId !== 'number')
     return;
-  isTabActive(tabId).then(function (active) {
+  isTabActive(tabId).then(async function (active) {
     if (active) {
       console.log("received request from clientScript on active tab", request);
-      dispatchNativeEvent(request, tabId);
+      await dispatchNativeEvent(request, tabId);
     }
+  }).catch(function (error) {
+    console.warn("failed to handle message", request, error.message);
   });
 });
 
@@ -104,7 +104,7 @@ async function dispatchNativeEvent(event, tabId) {
   else if (event.type === "beforeinput-is-trusted")
     cmd = "Input.insertText";
   else
-    throw new Error("Illegal native event: ", event);
+    throw new Error("Illegal native event: " + event.type);
   try {
     await chrome.debugger.sendCommand({tabId: tabId}, cmd, event);
     console.log("sendCommand", cmd, event);

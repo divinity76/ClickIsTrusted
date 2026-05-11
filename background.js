@@ -93,6 +93,11 @@ chrome.tabs.onActivated.addListener(async function callback(data) {
   await updateIcon(data.tabId);
 });
 
+chrome.tabs.onUpdated.addListener(async function callback(tabId) {
+  // Chrome can reset the per-tab action icon during reload/navigation.
+  await updateIcon(tabId);
+});
+
 chrome.debugger.onDetach.addListener(async function callback(source) {
   if (source && typeof source.tabId === 'number')
     await setTabActive(source.tabId, false);

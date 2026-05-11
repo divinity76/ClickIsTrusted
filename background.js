@@ -79,6 +79,14 @@ async function detachTab(tabId) {
   await setTabActive(tabId, false);
 }
 
+async function deactivateFailedTab(tabId, error) {
+  if (error.message && error.message.includes("Debugger is not attached")) {
+    await setTabActive(tabId, false);
+    return;
+  }
+  await detachTab(tabId);
+}
+
 chrome.action.onClicked.addListener(async function callback(tab) {
   console.log("Action icon clicked. Attaching/detaching the tab.");
   const tabId = tab && tab.id;
@@ -137,6 +145,6 @@ async function dispatchNativeEvent(event, tabId) {
     console.log("sendCommand", cmd, event);
   } catch (error) {
     console.warn("sendCommand failed", cmd, event, error.message);
-    await setTabActive(tabId, false);
+    await deactivateFailedTab(tabId, error);
   }
 }

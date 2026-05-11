@@ -2,23 +2,42 @@
 
 //part 1. activating/deactivating the debugger via the extension action button.
 const STORAGE_KEY = 'activeTabs';
+const activeTabs = new Set();
+let activeTabsHydrated = false;
 
 function tabStorageKey(tabId) {
   return `${STORAGE_KEY}.${tabId}`;
 }
 
+async function hydrateActiveTabs() {
+  if (activeTabsHydrated)
+    return;
+
+  const data = await chrome.storage.session.get(null);
+  for (const key in data) {
+    if (key.startsWith(`${STORAGE_KEY}.`))
+      activeTabs.add(Number(key.slice(STORAGE_KEY.length + 1)));
+  }
+  activeTabsHydrated = true;
+}
+
 async function setTabActive(tabId, active) {
+  await hydrateActiveTabs();
+
   const key = tabStorageKey(tabId);
-  if (active)
+  if (active) {
+    activeTabs.add(tabId);
     await chrome.storage.session.set({[key]: true});
-  else
+  } else {
+    activeTabs.delete(tabId);
     await chrome.storage.session.remove(key);
+  }
   await updateIcon(tabId, active);
 }
 
 async function isTabActive(tabId) {
-  const key = tabStorageKey(tabId);
-  return Boolean((await chrome.storage.session.get(key))[key]);
+  await hydrateActiveTabs();
+  return activeTabs.has(tabId);
 }
 
 async function updateIcon(tabId, active) {
